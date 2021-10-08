@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.6;
+pragma solidity 0.8.9;
 
 import "ds-test/test.sol";
 
-import "./CurveLpOracle.sol";
+import "./CurveLPOracle.sol";
 
 contract CurveLpOracleTest is DSTest {
     CurveLpOracle oracle;

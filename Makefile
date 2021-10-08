@@ -1,4 +1,4 @@
-all    :; dapp build
+all    :; dapp --use solc:0.8.9 build
 clean  :; dapp clean
-test   :; dapp test
-deploy :; dapp create CurveLpOracle
+test   :; dapp --use solc:0.8.9 test
+deploy :; dapp create CurveLPOracle
