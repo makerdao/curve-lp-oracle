@@ -19,7 +19,7 @@
 
 pragma solidity 0.8.9;
 
-interface CurvePool {
+interface CurvePoolLike {
     function coins(uint256) external view returns (address);
     function get_virtual_price() external view returns (uint256);
 }
@@ -70,9 +70,9 @@ contract CurveLPOracle {
     event Start();
     event Step(uint256 hop);
     event Link(uint256 id, address orb);
-//    event Value(uint128 curVal, uint128 nxtVal);
-//    event Kiss(address a);
-//    event Diss(address a);
+    event Value(uint128 curVal, uint128 nxtVal);
+    event Kiss(address a);
+    event Diss(address a);
 
     // --- Init ---
     constructor(address _pool, bytes32 _wat, address[] memory _orbs) {
@@ -80,13 +80,12 @@ contract CurveLPOracle {
         pool = _pool;
         wat  = _wat;
         uint256 n;
-        unchecked {  // avoid SafeMath overhead on ++
-            for (;; n++) {
-                (bool ok,) = _pool.call(abi.encodeWithSignature("coins(uint256)", n));
-                if (!ok) break;
-                require(_orbs[n] != address(0), "CurveLPOracle/invalid-orb");
-                orbs.push(_orbs[n]);
-            }
+        for (;;) {
+            (bool ok,) = _pool.call(abi.encodeWithSignature("coins(uint256)", n));
+            if (!ok) break;
+            require(_orbs[n] != address(0), "CurveLPOracle/invalid-orb");
+            orbs.push(_orbs[n]);
+            unchecked { n++; }
         }
         ncoins = n;
         wards[msg.sender] = 1;
@@ -117,5 +116,116 @@ contract CurveLPOracle {
         require(_id < ncoins, "CurveLPOracle/invalid-orb-index");
         orbs[_id] = _orb;
         emit Link(_id, _orb);
+    }
+
+    // For consistency with other oracles
+    function zzz() external view returns (uint256) {
+        if (zph == 0) return 0;  // backwards compatibility
+        return zph - hop;
+    }
+
+    function pass() external view returns (bool) {
+        return block.timestamp >= zph;
+    }
+
+    function poke() external {
+
+        // Ensure a single SLOAD while avoiding solc's excessive bitmasking bureaucracy.
+        uint256 hop_;
+        {
+
+            // Block-scoping these variables saves some gas.
+            uint256 stopped_;
+            uint256 zph_;
+            assembly {
+                let slot1 := sload(1)
+                stopped_  := and(slot1,         0xff  )
+                hop_      := and(shr(8, slot1), 0xffff)
+                zph_      := shr(24, slot1)
+            }
+
+            // When stopped, values are set to zero and should remain such; thus, disallow updating in that case.
+            require(stopped_ == 0, "UNIV2LPOracle/is-stopped");
+
+            // Equivalent to requiring that pass() returns true; logic repeated to save gas.
+            require(block.timestamp >= zph_, "UNIV2LPOracle/not-passed");
+        }
+
+        uint256 val = type(uint256).max;
+        for (uint256 i = 0; i < ncoins;) {
+            uint256 price = OracleLike(orbs[i]).read();
+            if (price < val) val = price;
+            unchecked { i++; }
+        }
+        val = val * CurvePoolLike(pool).get_virtual_price() / 10**18;
+        require(val != 0, "CurveLPOracle/invalid-price");
+        require(val <= type(uint128).max, "CurveLPOracle/val-overflow");
+        Feed memory cur_ = nxt;
+        cur = cur_;
+        nxt = Feed(uint128(val), 1);
+
+        // The below is equivalent to:
+        //    zph = block.timestamp + hop
+        // but ensures no extra SLOADs are performed.
+        //
+        // Even if _hop = (2^16 - 1), the maximum possible value, add(timestamp(), _hop)
+        // will not overflow (even a 232 bit value) for a very long time.
+        //
+        // Also, we know stopped was zero, so there is no need to account for it explicitly here.
+        assembly {
+            sstore(
+                1,
+                add(
+                    shl(24, add(timestamp(), hop_)),  // zph value starts 24 bits in
+                    shl(8, hop_)                      // hop value starts 8 bits in
+                )
+            )
+        }
+
+        emit Value(cur_.val, uint128(val));
+
+        // Safe to terminate immediately since no postfix modifiers are applied.
+        assembly { stop() }
+    }
+
+    function peek() external view toll returns (bytes32,bool) {
+        return (bytes32(uint256(cur.val)), cur.has == 1);
+    }
+
+    function peep() external view toll returns (bytes32,bool) {
+        return (bytes32(uint256(nxt.val)), nxt.has == 1);
+    }
+
+    function read() external view toll returns (bytes32) {
+        require(cur.has == 1, "CurveLPOracle/no-current-value");
+        return (bytes32(uint256(cur.val)));
+    }
+
+    function kiss(address _a) external auth {
+        require(_a != address(0), "CurveLPOracle/no-contract-0");
+        bud[_a] = 1;
+        emit Kiss(_a);
+    }
+
+    function kiss(address[] calldata _a) external auth {
+        for(uint256 i = 0; i < _a.length;) {
+            require(_a[i] != address(0), "UNIV2LPOracle/no-contract-0");
+            bud[_a[i]] = 1;
+            emit Kiss(_a[i]);
+            unchecked { i++; }
+        }
+    }
+
+    function diss(address _a) external auth {
+        bud[_a] = 0;
+        emit Diss(_a);
+    }
+
+    function diss(address[] calldata _a) external auth {
+        for(uint256 i = 0; i < _a.length;) {
+            bud[_a[i]] = 0;
+            emit Diss(_a[i]);
+            unchecked { i++; }
+        }
     }
 }
