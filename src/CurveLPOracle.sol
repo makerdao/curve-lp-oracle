@@ -77,13 +77,8 @@ contract CurveLPOracle {
     // --- Init ---
     constructor(address _pool, bytes32 _wat, address[] memory _orbs) {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
-
-        wards[msg.sender] = 1;
-        emit Rely(msg.sender);
-
         pool = _pool;
         wat  = _wat;
-
         uint256 n;
         unchecked {  // avoid SafeMath overhead on ++
             for (;; n++) {
@@ -94,6 +89,8 @@ contract CurveLPOracle {
             }
         }
         ncoins = n;
+        wards[msg.sender] = 1;
+        emit Rely(msg.sender);
     }
 
     function stop() external auth {
