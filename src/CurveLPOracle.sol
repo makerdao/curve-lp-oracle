@@ -35,7 +35,7 @@ contract CurveLPOracle {
     function rely(address _usr) external auth { wards[_usr] = 1; emit Rely(_usr); }  // Add admin
     function deny(address _usr) external auth { wards[_usr] = 0; emit Deny(_usr); }  // Remove admin
     modifier auth {
-        require(wards[msg.sender] == 1, "UNIV2LPOracle/not-authorized");
+        require(wards[msg.sender] == 1, "CurveLPOracle/not-authorized");
         _;
     }
 
@@ -145,10 +145,10 @@ contract CurveLPOracle {
             }
 
             // When stopped, values are set to zero and should remain such; thus, disallow updating in that case.
-            require(stopped_ == 0, "UNIV2LPOracle/is-stopped");
+            require(stopped_ == 0, "CurveLPOracle/is-stopped");
 
             // Equivalent to requiring that pass() returns true; logic repeated to save gas.
-            require(block.timestamp >= zph_, "UNIV2LPOracle/not-passed");
+            require(block.timestamp >= zph_, "CurveLPOracle/not-passed");
         }
 
         uint256 val = type(uint256).max;
@@ -158,8 +158,8 @@ contract CurveLPOracle {
             unchecked { i++; }
         }
         val = val * CurvePoolLike(pool).get_virtual_price() / 10**18;
-        require(val != 0, "CurveLPOracle/invalid-price");
-        require(val <= type(uint128).max, "CurveLPOracle/val-overflow");
+        require(val != 0, "CurveLPOracle/zero-price");
+        require(val <= type(uint128).max, "CurveLPOracle/price-overflow");
         Feed memory cur_ = nxt;
         cur = cur_;
         nxt = Feed(uint128(val), 1);
@@ -209,7 +209,7 @@ contract CurveLPOracle {
 
     function kiss(address[] calldata _a) external auth {
         for(uint256 i = 0; i < _a.length;) {
-            require(_a[i] != address(0), "UNIV2LPOracle/no-contract-0");
+            require(_a[i] != address(0), "CurveLPOracle/no-contract-0");
             bud[_a[i]] = 1;
             emit Kiss(_a[i]);
             unchecked { i++; }
