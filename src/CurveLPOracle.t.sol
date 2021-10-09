@@ -54,6 +54,17 @@ contract CurveLpOracleTest is DSTest {
         orbs.push(address(new MockOracle()));
         oracle = new CurveLPOracle(address(pool), "123CRV", orbs);
         oracle.step(DEFAULT_HOP);
+
+        // set up some default price values
+        MockOracle(orbs[0]).setPrice(100 * WAD);
+        MockOracle(orbs[1]).setPrice(100 * WAD);
+        MockOracle(orbs[2]).setPrice(100 * WAD);
+        pool.setVirtualPrice(WAD);  // 1
+
+        // Get valid cur and nxt
+        oracle.poke();
+        hevm.warp(oracle.zph());
+        oracle.poke();
     }
 
     function test_constructor_and_public_fields() public {
@@ -171,5 +182,112 @@ contract CurveLpOracleTest is DSTest {
         assertTrue(has);
         uint256 secondPrice = (101 * WAD) * pool.get_virtual_price() / WAD;  // minimum price used to value all assets
         assertEq(uint256(val), secondPrice);
+    }
+
+    function test_kiss_single() public {
+        assertTrue(oracle.bud(address(this)) == 0);         // Verify caller is not whitelisted
+        oracle.kiss(address(this));                         // Whitelist caller
+        assertTrue(oracle.bud(address(this)) == 1);         // Verify caller is whitelisted
+        oracle.kiss(address(this));
+        assertTrue(oracle.bud(address(this)) == 1);         // Ensure idempotency
+    }
+
+    function testFail_kiss_single_not_authed() public {
+        oracle.deny(address(this));                         // Remove owner
+        oracle.kiss(address(this));                         // Attempt to whitelist caller
+    }
+
+    function testFail_kiss_single_zero_address() public {
+        oracle.kiss(address(0));                            // Attempt to whitelist 0 address
+    }
+
+    function test_diss_single() public {
+        oracle.kiss(address(this));                         // Whitelist caller
+        assertTrue(oracle.bud(address(this)) == 1);         // Verify caller is whitelisted
+        oracle.diss(address(this));                         // Remove caller from whitelist
+        assertTrue(oracle.bud(address(this)) == 0);         // Verify caller is not whitelisted
+        oracle.diss(address(this));
+        assertTrue(oracle.bud(address(this)) == 0);         // Ensure idempotency
+    }
+
+    function testFail_diss_single() public {
+        oracle.deny(address(this));                         // Remove owner
+        oracle.diss(address(this));                         // Attempt to remove caller from whitelist
+    }
+
+    function test_whiltelisting() public {
+        oracle.kiss(address(this));
+        oracle.peek();
+        oracle.peep();
+        oracle.read();
+    }
+
+    function testFail_peek_not_whitelisted() public {
+        oracle.diss(address(this));  // Ensure caller not authorized to read prices
+        oracle.peek();
+    }
+
+    function testFail_peep_not_whitelisted() public {
+        oracle.diss(address(this));  // Ensure caller not authorized to read prices
+        oracle.peep();
+    }
+
+    function testFail_read_not_whitelisted() public {
+        oracle.diss(address(this));  // Ensure caller not authorized to read prices
+        oracle.peep();
+    }
+
+    function test_kiss_and_diss_multiple() public {
+        address[] memory guys = new address[](4);
+        for (uint256 i = 0; i < guys.length; i++) {
+            guys[i] = address(uint160(17 * i + 1));
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+        oracle.kiss(guys);
+        for (uint256 i = 0; i < guys.length; i++) {
+            assertEq(oracle.bud(guys[i]), 1);
+        }
+        oracle.kiss(guys);  // Idempotency
+        for (uint256 i = 0; i < guys.length; i++) {
+            assertEq(oracle.bud(guys[i]), 1);
+        }
+        oracle.diss(guys);
+        for (uint256 i = 0; i < guys.length; i++) {
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+        oracle.diss(guys);  // Idempotency
+        for (uint256 i = 0; i < guys.length; i++) {
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+    }
+
+    function testFail_kiss_multiple_not_authed() public {
+        oracle.deny(address(this));
+        address[] memory guys = new address[](4);
+        for (uint256 i = 0; i < guys.length; i++) {
+            guys[i] = address(uint160(17 * i + 1));
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+        oracle.kiss(guys);
+    }
+
+    function testFail_kiss_multiple_zero_address() public {
+        address[] memory guys = new address[](4);
+        for (uint256 i = 0; i < guys.length; i++) {
+            guys[i] = address(uint160(17 * i + 1));
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+        guys[1] = address(0);
+        oracle.kiss(guys);
+    }
+
+    function testFail_diss_multiple_not_authed() public {
+        oracle.deny(address(this));
+        address[] memory guys = new address[](4);
+        for (uint256 i = 0; i < guys.length; i++) {
+            guys[i] = address(uint160(17 * i + 1));
+            assertEq(oracle.bud(guys[i]), 0);
+        }
+        oracle.diss(guys);
     }
 }
