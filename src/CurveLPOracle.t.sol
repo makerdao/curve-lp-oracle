@@ -11,16 +11,8 @@ interface Hevm {
 
 contract MockCurvePool {
     uint256 public get_virtual_price;
-    address[] public coins;
-
     function setVirtualPrice(uint256 _vp) external {
         get_virtual_price = _vp;
-    }
-    function addCoin(address a) external {
-        coins.push(a);
-    }
-    function ncoins() external view returns (uint256) {
-        return coins.length;
     }
 }
 
@@ -46,9 +38,6 @@ contract CurveLpOracleTest is DSTest {
     function setUp() public {
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         pool = new MockCurvePool();
-        pool.addCoin(address(0x1));
-        pool.addCoin(address(0x2));
-        pool.addCoin(address(0x3));
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
@@ -72,7 +61,7 @@ contract CurveLpOracleTest is DSTest {
         assertEq(oracle.wards(address(this)), 1);
         assertTrue(oracle.pool() == address(pool));
         assertTrue(oracle.wat() == "123CRV");
-        assertEq(oracle.ncoins(), pool.ncoins());
+        assertEq(oracle.ncoins(), orbs.length);
         for (uint256 i = 0; i < orbs.length; i++) {
             assertTrue(oracle.orbs(i) == orbs[i]);
         }
