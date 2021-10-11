@@ -19,6 +19,10 @@
 
 pragma solidity 0.8.9;
 
+interface CurveRegistryLike {
+    function get_n_coins(address) external returns (uint256[2] calldata);
+}
+
 interface CurvePoolLike {
     function coins(uint256) external view returns (address);
     function get_virtual_price() external view returns (uint256);
@@ -26,6 +30,33 @@ interface CurvePoolLike {
 
 interface OracleLike {
     function read() external view returns (uint256);
+}
+
+contract CurveLPOracleFactory {
+
+    CurveRegistryLike immutable REGISTRY;
+
+    mapping (address => bool) public isOracle;
+
+    event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool);
+
+    constructor(address _registry) {
+        REGISTRY = CurveRegistryLike(_registry);
+    }
+
+    function build(
+        address _owner,
+        address _pool,
+        bytes32 _wat,
+        address[] calldata _orbs
+    ) external returns (address orcl) {
+        uint256 ncoins = REGISTRY.get_n_coins(_pool)[0];
+        orcl = address(new CurveLPOracle(_pool, ncoins, _wat, _orbs));
+        CurveLPOracle(orcl).rely(_owner);
+        CurveLPOracle(orcl).deny(address(this));
+        isOracle[orcl] = true;
+        emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
+    }
 }
 
 contract CurveLPOracle {
@@ -75,19 +106,17 @@ contract CurveLPOracle {
     event Diss(address a);
 
     // --- Init ---
-    constructor(address _pool, bytes32 _wat, address[] memory _orbs) {
+    constructor(address _pool, uint256 _ncoins, bytes32 _wat, address[] memory _orbs) {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
+        require(_orbs.length == _ncoins, "CurveLPOracle/ncoins-orbs-mismatch");
         pool = _pool;
         wat  = _wat;
-        uint256 n;
-        for (;;) {
-            (bool ok,) = _pool.call(abi.encodeWithSignature("coins(uint256)", n));
-            if (!ok) break;
-            require(_orbs[n] != address(0), "CurveLPOracle/invalid-orb");
-            orbs.push(_orbs[n]);
-            unchecked { n++; }
+        ncoins = _ncoins;
+        for (uint256 i = 0; i < _ncoins;) {
+            require(_orbs[i] != address(0), "CurveLPOracle/invalid-orb");
+            orbs.push(_orbs[i]);
+            unchecked { i++; }
         }
-        ncoins = n;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
     }
