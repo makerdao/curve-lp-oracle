@@ -20,7 +20,7 @@
 pragma solidity 0.8.9;
 
 interface CurveRegistryLike {
-    function get_n_coins(address) external returns (uint256[2] calldata);
+    function get_n_coins(address) external view returns (uint256[2] calldata);
 }
 
 interface CurvePoolLike {
