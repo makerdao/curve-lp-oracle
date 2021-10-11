@@ -109,8 +109,8 @@ contract CurveLPOracle {
     constructor(address _pool, uint256 _ncoins, bytes32 _wat, address[] memory _orbs) {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
         require(_orbs.length == _ncoins, "CurveLPOracle/ncoins-orbs-mismatch");
-        pool = _pool;
-        wat  = _wat;
+        pool   = _pool;
+        wat    = _wat;
         ncoins = _ncoins;
         for (uint256 i = 0; i < _ncoins;) {
             require(_orbs[i] != address(0), "CurveLPOracle/invalid-orb");

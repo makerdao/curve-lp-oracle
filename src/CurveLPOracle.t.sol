@@ -96,7 +96,33 @@ contract CurveLpOracleTest is DSTest {
     }
 
     function test_stop() public {
-        // TODO
+        oracle.kiss(address(this));  // whitelist for reading
+ 
+        // Check that both current and pending values are non-zero and valid
+        (bytes32 val, bool has) = oracle.peek();
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+        (val, has) = oracle.peep();
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+
+        assertGt(uint256(oracle.zph()), 0);
+        assertGt(oracle.zzz(), 0);
+
+        assertEq(oracle.stopped(), 0);
+        oracle.stop();
+        assertEq(oracle.stopped(), 1);
+
+        // Values should be zero and invalid
+        (val, has) = oracle.peek();
+        assertEq(uint256(val), 0);
+        assertTrue(!has);
+        (val, has) = oracle.peep();
+        assertEq(uint256(val), 0);
+        assertTrue(!has);
+
+        assertEq(uint256(oracle.zph()), 0);
+        assertEq(oracle.zzz(), 0);
     }
 
     function testFail_stop_not_authed() public {
@@ -183,6 +209,21 @@ contract CurveLpOracleTest is DSTest {
         assertTrue(has);
         uint256 secondPrice = (101 * WAD) * pool.get_virtual_price() / WAD;  // minimum price used to value all assets
         assertEq(uint256(val), secondPrice);
+    }
+
+    function testFail_poke_stopped() public {
+        hevm.warp(oracle.zph());
+        assertTrue(oracle.pass());
+        oracle.stop();
+        oracle.poke();
+    }
+
+    function test_poke_restarted() public {
+        hevm.warp(oracle.zph());
+        assertTrue(oracle.pass());
+        oracle.stop();
+        oracle.start();
+        oracle.poke();
     }
 
     function test_kiss_single() public {
