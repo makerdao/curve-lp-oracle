@@ -72,9 +72,9 @@ contract CurveLPOracle {
 
     // stopped, hop, and zph are packed into single slot to reduce SLOADs;
     // this outweighs the added bitmasking overhead.
-    uint8   public stopped;         // Stop/start ability to update
-    uint16  public hop = 1 hours;   // Minimum time in between price updates
-    uint232 public zph;             // Time of last price update plus hop
+    uint8   public stopped;        // Stop/start ability to update
+    uint16  public hop = 1 hours;  // Minimum time in between price updates
+    uint232 public zph;            // Time of last price update plus hop
 
     // --- Whitelisting ---
     mapping (address => uint256) public bud;
