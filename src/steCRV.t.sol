@@ -22,7 +22,7 @@ import "ds-test/test.sol";
 import "./CurveLPOracle.sol";
 
 interface Hevm {
-    function warp(uint256) external;
+    function store(address, bytes32, bytes32) external;
 }
 
 contract MockOracle {
@@ -37,8 +37,10 @@ contract MockOracle {
 
 contract ETHstETHPoolTest is DSTest {
 
-    address constant REGISTRY = address(0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c);
-    address constant POOL = address(0xDC24316b9AE028F1497c275EB9192a3Ea0f67022);
+    uint256 constant WAD = 10**18;
+    address constant REGISTRY   = 0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c;
+    address constant POOL       = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
+    address constant ETH_ORACLE = 0x81FE72B5A8d1A857d176C3E7d5Bd2679A9B85763;
 
     Hevm hevm;
     CurveLPOracleFactory factory;
@@ -48,9 +50,24 @@ contract ETHstETHPoolTest is DSTest {
     function setUp() public {
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         factory = new CurveLPOracleFactory(REGISTRY);
-        orbs.push(address(new MockOracle()));
+        orbs.push(ETH_ORACLE);
         orbs.push(address(new MockOracle()));
         oracle  = CurveLPOracle(factory.build(address(this), POOL, "steCRV", orbs));
+        oracle.kiss(address(this));
+
+        // Whitelist steCRV oracle to read from the ETH oracle
+        hevm.store(
+            ETH_ORACLE,
+            keccak256(abi.encode(address(oracle), uint256(5))),
+            bytes32(uint256(1))
+        );
+
+        // Whitelist this contract to read from the ETH oracle
+        hevm.store(
+            ETH_ORACLE,
+            keccak256(abi.encode(address(this), uint256(5))),
+            bytes32(uint256(1))
+        );
     }
 
     function test_build() public {
@@ -63,5 +80,20 @@ contract ETHstETHPoolTest is DSTest {
         for (uint256 i = 0; i < orbs.length; i++) {
             assertTrue(orbs[i] == oracle.orbs(i)); 
         }
+    }
+
+    function test_poke() public {
+        uint256 p_ETH = OracleLike(orbs[0]).read();
+        uint256 p_steETH = 3_479 * WAD / 1000;
+        MockOracle(orbs[1]).setPrice(p_steETH);
+        uint256 min = p_ETH > p_steETH ? p_steETH : p_ETH;
+        uint256 p_virt = CurvePoolLike(POOL).get_virtual_price();
+        uint256 expectation = p_virt * min / WAD;
+
+        oracle.poke();
+
+        (bytes32 val, bool has) = oracle.peep();
+        assertTrue(has);
+        assertEq(expectation, uint256(val));
     }
 }
