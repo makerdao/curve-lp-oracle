@@ -40,7 +40,7 @@ contract ETHstETHPoolTest is DSTest {
     uint256 constant WAD = 10**18;
     address constant REGISTRY   = 0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c;
     address constant POOL       = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
-    address constant ETH_ORACLE = 0x81FE72B5A8d1A857d176C3E7d5Bd2679A9B85763;
+    address constant ETH_ORACLE = 0x64DE91F5A373Cd4c28de3600cB34C7C6cE410C85;
 
     Hevm hevm;
     CurveLPOracleFactory factory;
@@ -58,14 +58,14 @@ contract ETHstETHPoolTest is DSTest {
         // Whitelist steCRV oracle to read from the ETH oracle
         hevm.store(
             ETH_ORACLE,
-            keccak256(abi.encode(address(oracle), uint256(5))),
+            keccak256(abi.encode(address(oracle), uint256(4))),
             bytes32(uint256(1))
         );
 
         // Whitelist this contract to read from the ETH oracle
         hevm.store(
             ETH_ORACLE,
-            keccak256(abi.encode(address(this), uint256(5))),
+            keccak256(abi.encode(address(this), uint256(4))),
             bytes32(uint256(1))
         );
     }
