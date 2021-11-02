@@ -36,8 +36,6 @@ contract CurveLPOracleFactory {
 
     CurveRegistryLike immutable REGISTRY;
 
-    mapping (address => bool) public isOracle;
-
     event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool);
 
     constructor(address _registry) {
@@ -53,7 +51,6 @@ contract CurveLPOracleFactory {
         uint256 ncoins = REGISTRY.get_n_coins(_pool)[0];
         require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
         orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
-        isOracle[orcl] = true;
         emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
     }
 }

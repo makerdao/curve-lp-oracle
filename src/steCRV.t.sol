@@ -71,7 +71,6 @@ contract ETHstETHPoolTest is DSTest {
     }
 
     function test_build() public {
-        assertTrue(factory.isOracle(address(oracle)));
         assertEq(oracle.wards(address(factory)), 0);
         assertEq(oracle.wards(address(this)), 1);
         assertTrue(oracle.pool() == POOL);

@@ -48,7 +48,6 @@ contract CurveLPOracleFactoryTest is DSTest {
 
     function test_build() public {
         CurveLPOracle oracle = CurveLPOracle(factory.build(address(0x123), address(0x9001), "CRVPOOL", orbs));
-        assertTrue(factory.isOracle(address(oracle)));
         assertEq(oracle.wards(address(factory)), 0);
         assertEq(oracle.wards(address(0x123)), 1);
         assertTrue(oracle.pool() == address(0x9001));
