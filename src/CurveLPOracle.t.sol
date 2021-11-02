@@ -277,7 +277,7 @@ contract CurveLPOracleTest is DSTest {
 
     function testFail_read_not_whitelisted() public {
         oracle.diss(address(this));  // Ensure caller not authorized to read prices
-        oracle.peep();
+        oracle.read();
     }
 
     function test_kiss_and_diss_multiple() public {
