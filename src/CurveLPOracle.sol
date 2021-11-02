@@ -51,9 +51,8 @@ contract CurveLPOracleFactory {
         address[] calldata _orbs
     ) external returns (address orcl) {
         uint256 ncoins = REGISTRY.get_n_coins(_pool)[0];
-        orcl = address(new CurveLPOracle(_pool, ncoins, _wat, _orbs));
-        CurveLPOracle(orcl).rely(_owner);
-        CurveLPOracle(orcl).deny(address(this));
+        require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
+        orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
         isOracle[orcl] = true;
         emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
     }
@@ -106,9 +105,9 @@ contract CurveLPOracle {
     event Diss(address a);
 
     // --- Init ---
-    constructor(address _pool, uint256 _ncoins, bytes32 _wat, address[] memory _orbs) {
+    constructor(address _ward, address _pool, bytes32 _wat, address[] memory _orbs) {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
-        require(_orbs.length == _ncoins, "CurveLPOracle/ncoins-orbs-mismatch");
+        uint256 _ncoins = _orbs.length;
         pool   = _pool;
         wat    = _wat;
         ncoins = _ncoins;
@@ -117,8 +116,9 @@ contract CurveLPOracle {
             orbs.push(_orbs[i]);
             unchecked { i++; }
         }
-        wards[msg.sender] = 1;
-        emit Rely(msg.sender);
+        require(_ward != address(0), "CurveLPOracle/ward-0");
+        wards[_ward] = 1;
+        emit Rely(_ward);
     }
 
     function stop() external auth {

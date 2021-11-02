@@ -57,7 +57,7 @@ contract CurveLPOracleTest is DSTest {
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
-        oracle = new CurveLPOracle(address(pool), orbs.length, "123CRV", orbs);
+        oracle = new CurveLPOracle(address(this), address(pool), "123CRV", orbs);
         oracle.step(DEFAULT_HOP);
 
         // set up some default price values
@@ -73,8 +73,8 @@ contract CurveLPOracleTest is DSTest {
     }
 
     function test_constructor_and_public_fields() public {
-        oracle = new CurveLPOracle(address(pool), orbs.length, "123CRV", orbs);
-        assertEq(oracle.wards(address(this)), 1);
+        oracle = new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs);
+        assertEq(oracle.wards(address(0x123)), 1);
         assertTrue(oracle.pool() == address(pool));
         assertTrue(oracle.wat() == "123CRV");
         assertEq(oracle.ncoins(), orbs.length);
@@ -83,21 +83,17 @@ contract CurveLPOracleTest is DSTest {
         }
     }
 
+    function testFail_constructor_ward_zero() public {
+        new CurveLPOracle(address(0), address(pool), "123CRV", orbs);
+    }
+
     function testFail_constructor_pool_addr_zero() public {
-        new CurveLPOracle(address(0), orbs.length, "123CRV", orbs);
-    }
-
-    function testFail_constructor_too_few_orbs() public {
-        new CurveLPOracle(address(pool), orbs.length + 1, "123CRV", orbs);
-    }
-
-    function testFail_constructor_too_many_orbs() public {
-        new CurveLPOracle(address(pool), orbs.length - 1, "123CRV", orbs);
+        new CurveLPOracle(address(0x123), address(0), "123CRV", orbs);
     }
 
     function testFail_constructor_zero_orb() public {
         orbs[1] = address(0);
-        new CurveLPOracle(address(pool), orbs.length, "123CRV", orbs);
+        new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs);
     }
 
     function test_stop() public {
