@@ -132,7 +132,11 @@ contract CurveLPOracle {
     }
 
     function step(uint16 _hop) external auth {
+        uint16 old = hop;
         hop = _hop;
+        if (zph >= old) {  // if false, zph will be unset and no update is needed
+            zph = (zph - old) + _hop;
+        }
         emit Step(_hop);
     }
 

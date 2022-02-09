@@ -96,6 +96,42 @@ contract CurveLPOracleTest is DSTest {
         new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs);
     }
 
+    function test_step() public {
+        uint16  oldHop =  oracle.hop();
+        uint16  newHop =  oldHop + 1800;  // newHop > oldHop
+        uint232 zph    =  oracle.zph();
+        uint256 zzz    =  oracle.zzz();
+        assertTrue(zph >= oldHop);  // we'll test the < case later
+
+        // increase hop
+        oracle.step(newHop);
+
+        assertEq(oracle.hop(), newHop);
+        assertEq(oracle.zph(), zph - oldHop + newHop);
+        assertEq(oracle.zzz(), zzz);
+
+        // decrease hop
+        oracle.step(oldHop);
+
+        assertEq(oracle.hop(), oldHop);
+        assertEq(oracle.zph(), zph);  // back to original value
+        assertEq(oracle.zzz(), zzz);
+
+        oracle.stop();  // sets zph to zero
+
+        // Because block.timestamp is monotone and zph is always set to block.timestamp + hop in poke(),
+        // zph == 0 is the only possible situation in which zph < oldHop can obtain.
+        assertTrue(oracle.zph() < oldHop);
+        assertEq(oracle.zph(), 0);
+        assertEq(oracle.zzz(), 0);
+
+        oracle.step(newHop);
+
+        assertEq(oracle.hop(), newHop);
+        assertEq(oracle.zph(), 0);  // unset, so no change
+        assertEq(oracle.zzz(), 0);
+    }
+
     function test_stop() public {
         oracle.kiss(address(this));  // whitelist for reading
  
