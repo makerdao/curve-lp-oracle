@@ -19,6 +19,10 @@
 
 pragma solidity 0.8.11;
 
+interface AddressProviderLike {
+    function get_registry() external view returns (address);
+}
+
 interface CurveRegistryLike {
     function get_n_coins(address) external view returns (uint256[2] calldata);
 }
@@ -34,12 +38,12 @@ interface OracleLike {
 
 contract CurveLPOracleFactory {
 
-    CurveRegistryLike immutable REGISTRY;
+    AddressProviderLike immutable ADDRESS_PROVIDER;
 
     event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool);
 
-    constructor(address _registry) {
-        REGISTRY = CurveRegistryLike(_registry);
+    constructor(address addressProvider) {
+        ADDRESS_PROVIDER = AddressProviderLike(addressProvider);
     }
 
     function build(
@@ -48,7 +52,7 @@ contract CurveLPOracleFactory {
         bytes32 _wat,
         address[] calldata _orbs
     ) external returns (address orcl) {
-        uint256 ncoins = REGISTRY.get_n_coins(_pool)[0];
+        uint256 ncoins = CurveRegistryLike(ADDRESS_PROVIDER.get_registry()).get_n_coins(_pool)[0];
         require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
         orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
         emit NewCurveLPOracle(_owner, orcl, _wat, _pool);

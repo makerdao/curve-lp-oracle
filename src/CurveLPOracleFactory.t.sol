@@ -21,6 +21,16 @@ import "ds-test/test.sol";
 
 import "./CurveLPOracle.sol";
 
+contract MockAddressProvider {
+    address immutable REGISTRY;
+    constructor(address registry) {
+        REGISTRY = registry;
+    }
+    function get_registry() external view returns (address) {
+        return REGISTRY;
+    }
+}
+
 contract MockCurveRegistry {
     mapping (address => uint256) ncoins;
     function addPool(address _pool, uint256 _ncoins) external {
@@ -40,7 +50,8 @@ contract CurveLPOracleFactoryTest is DSTest {
     function setUp() public {
         registry = new MockCurveRegistry();
         registry.addPool(address(0x9001), 3);
-        factory = new CurveLPOracleFactory(address(registry));
+        MockAddressProvider addressProvider = new MockAddressProvider(address(registry));
+        factory = new CurveLPOracleFactory(address(addressProvider));
         orbs.push(address(0x1));
         orbs.push(address(0x2));
         orbs.push(address(0x3));
