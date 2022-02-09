@@ -81,8 +81,8 @@ contract CurveLPOracle {
         uint128 has;  // Is price valid
     }
 
-    Feed internal cur;  // Current price (mem slot 0x3)
-    Feed internal nxt;  // Queued price  (mem slot 0x4)
+    Feed internal cur;  // Current price (storage slot 0x3)
+    Feed internal nxt;  // Queued price  (storage slot 0x4)
 
     address[] public orbs;  // array of price feeds for pool assets, same order as in the pool
 
