@@ -131,9 +131,8 @@ contract CurveLPOracle {
         emit Start();
     }
 
-    function step(uint256 _hop) external auth {
-        require(_hop <= type(uint16).max, "CurveLPOracle/invalid-hop");
-        hop = uint16(_hop);
+    function step(uint16 _hop) external auth {
+        hop = _hop;
         emit Step(_hop);
     }
 

@@ -44,7 +44,7 @@ contract MockOracle {
 
 contract CurveLPOracleTest is DSTest {
     uint256 constant WAD = 10**18;
-    uint256 constant DEFAULT_HOP = 3600;  // 1 hour in seconds
+    uint16  constant DEFAULT_HOP = 3600;  // 1 hour in seconds
 
     Hevm hevm;
     MockCurvePool pool;
