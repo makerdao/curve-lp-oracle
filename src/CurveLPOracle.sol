@@ -161,7 +161,7 @@ contract CurveLPOracle {
         return block.timestamp >= zph;
     }
 
-    function poke() external {
+    function poke() external payable {
 
         // Ensure a single SLOAD while avoiding solc's excessive bitmasking bureaucracy.
         uint256 hop_;
