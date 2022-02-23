@@ -130,6 +130,16 @@ contract CurveLPOracleTest is DSTest {
         assertEq(oracle.hop(), newHop);
         assertEq(oracle.zph(), 0);  // unset, so no change
         assertEq(oracle.zzz(), 0);
+
+        oracle.step(0);
+        assertEq(oracle.hop(), 0);
+        assertEq(oracle.zph(), 0);  // unset, so no change
+        assertEq(oracle.zzz(), 0);
+
+        oracle.step(1);  // 1 != 0
+        assertEq(oracle.hop(), 1);
+        assertEq(oracle.zph(), 0);  // unset, so no change
+        assertEq(oracle.zzz(), 0);
     }
 
     function test_stop() public {
