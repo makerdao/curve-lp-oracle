@@ -37,8 +37,8 @@ contract MockCurveRegistry {
         ncoins[_pool] = _ncoins;
     }
     function get_n_coins(address _pool) external view returns (uint256[2] memory ncoins_) {
-        ncoins_[0] = ncoins[_pool];
-        ncoins_[1] = 42;  // return nonsense value so it's obvious if this is accessed when it shouldn't be
+        ncoins_[0] = 42;  // return nonsense value so it's obvious if this is accessed when it shouldn't be
+        ncoins_[1] = ncoins[_pool];
     }
 }
 

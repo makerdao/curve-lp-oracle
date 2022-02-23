@@ -52,7 +52,7 @@ contract CurveLPOracleFactory {
         bytes32 _wat,
         address[] calldata _orbs
     ) external returns (address orcl) {
-        uint256 ncoins = CurveRegistryLike(ADDRESS_PROVIDER.get_registry()).get_n_coins(_pool)[0];
+        uint256 ncoins = CurveRegistryLike(ADDRESS_PROVIDER.get_registry()).get_n_coins(_pool)[1];
         require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
         orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
         emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
