@@ -161,6 +161,7 @@ contract CurveLPOracle {
         return block.timestamp >= zph;
     }
 
+    // Marked payable to save gas. DO *NOT* send ETH to poke(), it will be lost permanently.
     function poke() external payable {
 
         // Ensure a single SLOAD while avoiding solc's excessive bitmasking bureaucracy.
