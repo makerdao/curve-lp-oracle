@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.9;
+pragma solidity 0.8.11;
 
 import "ds-test/test.sol";
 
@@ -38,9 +38,9 @@ contract MockOracle {
 contract ETHstETHPoolTest is DSTest {
 
     uint256 constant WAD = 10**18;
-    address constant REGISTRY   = 0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c;
-    address constant POOL       = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
-    address constant ETH_ORACLE = 0x64DE91F5A373Cd4c28de3600cB34C7C6cE410C85;
+    address constant ADDRESS_PROVIDER = 0x0000000022D53366457F9d5E68Ec105046FC4383;
+    address constant POOL             = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
+    address constant ETH_ORACLE       = 0x64DE91F5A373Cd4c28de3600cB34C7C6cE410C85;
 
     Hevm hevm;
     CurveLPOracleFactory factory;
@@ -49,7 +49,7 @@ contract ETHstETHPoolTest is DSTest {
 
     function setUp() public {
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-        factory = new CurveLPOracleFactory(REGISTRY);
+        factory = new CurveLPOracleFactory(ADDRESS_PROVIDER);
         orbs.push(ETH_ORACLE);
         orbs.push(address(new MockOracle()));
         oracle  = CurveLPOracle(factory.build(address(this), POOL, "steCRV", orbs));

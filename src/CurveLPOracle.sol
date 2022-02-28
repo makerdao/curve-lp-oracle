@@ -17,7 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.9;
+pragma solidity 0.8.11;
+
+interface AddressProviderLike {
+    function get_registry() external view returns (address);
+}
 
 interface CurveRegistryLike {
     function get_n_coins(address) external view returns (uint256[2] calldata);
@@ -34,12 +38,12 @@ interface OracleLike {
 
 contract CurveLPOracleFactory {
 
-    CurveRegistryLike immutable REGISTRY;
+    AddressProviderLike immutable ADDRESS_PROVIDER;
 
     event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool);
 
-    constructor(address _registry) {
-        REGISTRY = CurveRegistryLike(_registry);
+    constructor(address addressProvider) {
+        ADDRESS_PROVIDER = AddressProviderLike(addressProvider);
     }
 
     function build(
@@ -48,7 +52,7 @@ contract CurveLPOracleFactory {
         bytes32 _wat,
         address[] calldata _orbs
     ) external returns (address orcl) {
-        uint256 ncoins = REGISTRY.get_n_coins(_pool)[0];
+        uint256 ncoins = CurveRegistryLike(ADDRESS_PROVIDER.get_registry()).get_n_coins(_pool)[1];
         require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
         orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
         emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
@@ -81,8 +85,8 @@ contract CurveLPOracle {
         uint128 has;  // Is price valid
     }
 
-    Feed internal cur;  // Current price (mem slot 0x3)
-    Feed internal nxt;  // Queued price  (mem slot 0x4)
+    Feed internal cur;  // Current price (storage slot 0x3)
+    Feed internal nxt;  // Queued price  (storage slot 0x4)
 
     address[] public orbs;  // array of price feeds for pool assets, same order as in the pool
 
@@ -131,9 +135,12 @@ contract CurveLPOracle {
         emit Start();
     }
 
-    function step(uint256 _hop) external auth {
-        require(_hop <= type(uint16).max, "CurveLPOracle/invalid-hop");
-        hop = uint16(_hop);
+    function step(uint16 _hop) external auth {
+        uint16 old = hop;
+        hop = _hop;
+        if (zph > old) {  // if false, zph will be unset and no update is needed
+            zph = (zph - old) + _hop;
+        }
         emit Step(_hop);
     }
 
@@ -154,7 +161,8 @@ contract CurveLPOracle {
         return block.timestamp >= zph;
     }
 
-    function poke() external {
+    // Marked payable to save gas. DO *NOT* send ETH to poke(), it will be lost permanently.
+    function poke() external payable {
 
         // Ensure a single SLOAD while avoiding solc's excessive bitmasking bureaucracy.
         uint256 hop_;

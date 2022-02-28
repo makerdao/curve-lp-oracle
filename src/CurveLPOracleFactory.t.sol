@@ -15,11 +15,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.9;
+pragma solidity 0.8.11;
 
 import "ds-test/test.sol";
 
 import "./CurveLPOracle.sol";
+
+contract MockAddressProvider {
+    address immutable REGISTRY;
+    constructor(address registry) {
+        REGISTRY = registry;
+    }
+    function get_registry() external view returns (address) {
+        return REGISTRY;
+    }
+}
 
 contract MockCurveRegistry {
     mapping (address => uint256) ncoins;
@@ -27,8 +37,8 @@ contract MockCurveRegistry {
         ncoins[_pool] = _ncoins;
     }
     function get_n_coins(address _pool) external view returns (uint256[2] memory ncoins_) {
-        ncoins_[0] = ncoins[_pool];
-        ncoins_[1] = 42;  // return nonsense value so it's obvious if this is accessed when it shouldn't be
+        ncoins_[0] = 42;  // return nonsense value so it's obvious if this is accessed when it shouldn't be
+        ncoins_[1] = ncoins[_pool];
     }
 }
 
@@ -40,7 +50,8 @@ contract CurveLPOracleFactoryTest is DSTest {
     function setUp() public {
         registry = new MockCurveRegistry();
         registry.addPool(address(0x9001), 3);
-        factory = new CurveLPOracleFactory(address(registry));
+        MockAddressProvider addressProvider = new MockAddressProvider(address(registry));
+        factory = new CurveLPOracleFactory(address(addressProvider));
         orbs.push(address(0x1));
         orbs.push(address(0x2));
         orbs.push(address(0x3));
