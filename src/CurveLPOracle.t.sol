@@ -23,6 +23,7 @@ import "./CurveLPOracle.sol";
 
 interface Hevm {
     function warp(uint256) external;
+    function load(address, bytes32 slot) external returns (bytes32);
 }
 
 contract MockCurvePool {
@@ -144,7 +145,7 @@ contract CurveLPOracleTest is DSTest {
 
     function test_stop() public {
         oracle.kiss(address(this));  // whitelist for reading
- 
+
         // Check that both current and pending values are non-zero and valid
         (bytes32 val, bool has) = oracle.peek();
         assertGt(uint256(val), 0);
@@ -378,5 +379,58 @@ contract CurveLPOracleTest is DSTest {
             assertEq(oracle.bud(guys[i]), 0);
         }
         oracle.diss(guys);
+    }
+
+
+    // This test will fail if the value of `val` at peek does not match memory slot 0x3
+    function testCurSlot0x3() public {
+        //oracle.poke();                                     // Poke oracle (done in setUp())
+        hevm.warp(oracle.zzz() + oracle.hop() + 1);          // Time travel into the future
+        oracle.poke();                                       // Poke oracle again
+        oracle.kiss(address(this));                          // Whitelist caller
+        (bytes32 val, bool has) = oracle.peek();             // Peek oracle price without caller being whitelisted
+        assertTrue(has);                                     // Verify oracle has value
+        assertTrue(val != bytes32(0));                       // Verify peep returned valid value
+
+        // Load memory slot 0x3
+        // Keeps `cur` slot parity with OSMs
+        bytes32 curPacked = hevm.load(address(oracle), bytes32(uint256(3)));
+
+        bytes16 memhas;
+        bytes16 memcur;
+        assembly {
+            memhas := curPacked
+            memcur := shl(128, curPacked)
+        }
+
+        assertTrue(uint256(uint128(memcur)) > 0);          // Assert nxt has value
+        assertEq(uint256(val), uint256(uint128(memcur)));  // Assert slot value == cur
+        assertEq(uint256(uint128(memhas)), 1);             // Assert slot has == 1
+    }
+
+    // This test will fail if the value of `val` at peep does not match memory slot 0x4
+    function testNxtSlot0x4() public {
+        //oracle.poke();                                   // Poke oracle (done in setUp())
+        hevm.warp(oracle.zzz() + oracle.hop() + 1);        // Time travel into the future
+        oracle.poke();                                     // Poke oracle again
+        oracle.kiss(address(this));                        // Whitelist caller
+        (bytes32 val, bool has) = oracle.peep();           // Peep oracle price without caller being whitelisted
+        assertTrue(has);                                   // Verify oracle has value
+        assertTrue(val != bytes32(0));                     // Verify peep returned valid value
+
+        // Load memory slot 0x4
+        // Keeps `nxt` slot parity with OSMs
+        bytes32 nxtPacked = hevm.load(address(oracle), bytes32(uint256(4)));
+
+        bytes16 memhas;
+        bytes16 memnxt;
+        assembly {
+            memhas := nxtPacked
+            memnxt := shl(128, nxtPacked)
+        }
+
+        assertTrue(uint256(uint128(memnxt)) > 0);          // Assert nxt has value
+        assertEq(uint256(val), uint256(uint128(memnxt)));  // Assert slot value == nxt
+        assertEq(uint256(uint128(memhas)), 1);             // Assert slot has == 1
     }
 }
