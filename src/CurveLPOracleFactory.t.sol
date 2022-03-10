@@ -20,6 +20,7 @@ pragma solidity 0.8.11;
 import "ds-test/test.sol";
 
 import "./CurveLPOracle.sol";
+import { MockCurvePool } from "./CurveLPOracle.t.sol";
 
 contract MockAddressProvider {
     address immutable REGISTRY;
@@ -46,10 +47,12 @@ contract CurveLPOracleFactoryTest is DSTest {
     address[] orbs;
     MockCurveRegistry registry;
     CurveLPOracleFactory factory;
+    MockCurvePool pool;
 
     function setUp() public {
         registry = new MockCurveRegistry();
-        registry.addPool(address(0x9001), 3);
+        pool = new MockCurvePool();
+        registry.addPool(address(pool), 3);
         MockAddressProvider addressProvider = new MockAddressProvider(address(registry));
         factory = new CurveLPOracleFactory(address(addressProvider));
         orbs.push(address(0x1));
@@ -58,10 +61,10 @@ contract CurveLPOracleFactoryTest is DSTest {
     }
 
     function test_build() public {
-        CurveLPOracle oracle = CurveLPOracle(factory.build(address(0x123), address(0x9001), "CRVPOOL", orbs));
+        CurveLPOracle oracle = CurveLPOracle(factory.build(address(0x123), address(pool), "CRVPOOL", orbs));
         assertEq(oracle.wards(address(factory)), 0);
         assertEq(oracle.wards(address(0x123)), 1);
-        assertTrue(oracle.pool() == address(0x9001));
+        assertTrue(oracle.pool() == address(pool));
         assertTrue(oracle.wat() == "CRVPOOL");
         assertEq(oracle.ncoins(), orbs.length);
         for (uint256 i = 0; i < orbs.length; i++) {

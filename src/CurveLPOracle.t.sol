@@ -28,6 +28,7 @@ interface Hevm {
 
 contract MockCurvePool {
     uint256 public get_virtual_price;
+    address public lp_token;
     function setVirtualPrice(uint256 _vp) external {
         get_virtual_price = _vp;
     }

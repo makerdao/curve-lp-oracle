@@ -30,6 +30,7 @@ interface CurveRegistryLike {
 interface CurvePoolLike {
     function coins(uint256) external view returns (address);
     function get_virtual_price() external view returns (uint256);
+    function lp_token() external view returns (address);
 }
 
 interface OracleLike {
@@ -69,6 +70,8 @@ contract CurveLPOracle {
         require(wards[msg.sender] == 1, "CurveLPOracle/not-authorized");
         _;
     }
+
+    address public immutable src;   // Price source, do not remove as needed for OmegaPoker
 
     // stopped, hop, and zph are packed into single slot to reduce SLOADs;
     // this outweighs the added bitmasking overhead.
@@ -110,6 +113,7 @@ contract CurveLPOracle {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
         uint256 _ncoins = _orbs.length;
         pool   = _pool;
+        src    = CurvePoolLike(_pool).lp_token();
         wat    = _wat;
         ncoins = _ncoins;
         for (uint256 i = 0; i < _ncoins;) {

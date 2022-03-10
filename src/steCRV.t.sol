@@ -41,6 +41,7 @@ contract ETHstETHPoolTest is DSTest {
     address constant ADDRESS_PROVIDER = 0x0000000022D53366457F9d5E68Ec105046FC4383;
     address constant POOL             = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
     address constant ETH_ORACLE       = 0x64DE91F5A373Cd4c28de3600cB34C7C6cE410C85;
+    address constant STECRV           = 0x06325440D014e39736583c165C2963BA99fAf14E;
 
     Hevm hevm;
     CurveLPOracleFactory factory;
@@ -74,6 +75,7 @@ contract ETHstETHPoolTest is DSTest {
         assertEq(oracle.wards(address(factory)), 0);
         assertEq(oracle.wards(address(this)), 1);
         assertTrue(oracle.pool() == POOL);
+        assertEq(oracle.src(), STECRV);
         assertTrue(oracle.wat() == "steCRV");
         assertEq(oracle.ncoins(), orbs.length);
         for (uint256 i = 0; i < orbs.length; i++) {
