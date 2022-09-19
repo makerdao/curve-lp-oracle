@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Copyright (C) 2021 Dai Foundation
 
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.11;
+pragma solidity 0.8.13;
 
 import "ds-test/test.sol";
 
@@ -61,7 +61,7 @@ contract CurveLPOracleFactoryTest is DSTest {
     }
 
     function test_build() public {
-        CurveLPOracle oracle = CurveLPOracle(factory.build(address(0x123), address(pool), "CRVPOOL", orbs));
+        CurveLPOracle oracle = CurveLPOracle(payable(factory.build(address(0x123), address(pool), "CRVPOOL", orbs, false)));
         assertEq(oracle.wards(address(factory)), 0);
         assertEq(oracle.wards(address(0x123)), 1);
         assertTrue(oracle.pool() == address(pool));
@@ -70,5 +70,9 @@ contract CurveLPOracleFactoryTest is DSTest {
         for (uint256 i = 0; i < orbs.length; i++) {
             assertTrue(orbs[i] == oracle.orbs(i));
         }
+        assertTrue(!oracle.nonreentrant());
+
+        oracle = CurveLPOracle(payable(factory.build(address(0x123), address(pool), "CRVPOOL", orbs, true)));
+        assertTrue(oracle.nonreentrant());
     }
 }
