@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Copyright (C) 2021 Dai Foundation
 
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.11;
+pragma solidity 0.8.13;
 
 import "ds-test/test.sol";
 
@@ -23,6 +23,23 @@ import "./CurveLPOracle.sol";
 
 interface Hevm {
     function store(address, bytes32, bytes32) external;
+}
+
+interface ERC20 {
+    function balanceOf(address) external returns (uint256);
+    function approve(address, uint256) external;
+}
+
+interface StethLike {
+    function getPooledEthByShares(uint256) external view returns (uint256);
+    function getSharesByPooledEth(uint256) external view returns (uint256);
+}
+
+// Using a different interface here to avoid polluting the CurvePoolLike
+// interface in CurveLPOracle.sol with functions only needed for testing.
+interface CurvePoolMutableLike {
+    function add_liquidity(uint256[2] calldata, uint256) external payable returns (uint256);
+    function remove_liquidity(uint256, uint256[2] calldata) external returns (uint256);
 }
 
 contract MockOracle {
@@ -35,6 +52,35 @@ contract MockOracle {
     }
 }
 
+contract Evil {
+    ERC20 constant STETH = ERC20(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    CurveLPOracle public immutable oracle;
+    CurvePoolMutableLike public immutable pool;
+
+    constructor(CurveLPOracle _oracle) payable {
+        oracle = _oracle;
+        address _pool = _oracle.pool();
+        pool = CurvePoolMutableLike(_pool);
+        STETH.approve(_pool, type(uint256).max);
+    }
+
+    function attack() external {
+        // We'll not worry about where we get ETH or stETH for the attack.
+        // We just deposit everything we have.
+        uint256[2] memory amounts;
+        uint256 ethBal = address(this).balance;
+        amounts[0] = ethBal;
+        amounts[1] = STETH.balanceOf(address(this));
+        uint256 lpAmount = pool.add_liquidity{value: ethBal}(amounts, 0);  // accept any slippage
+        uint256[2] memory minAmountsOut;  // leave zero to accept any slippage
+        pool.remove_liquidity(lpAmount, minAmountsOut);  // this will trigger the fallback function during execution
+    }
+
+    receive() external payable {
+        oracle.poke();
+    }
+}
+
 contract ETHstETHPoolTest is DSTest {
 
     uint256 constant WAD = 10**18;
@@ -42,6 +88,7 @@ contract ETHstETHPoolTest is DSTest {
     address constant POOL             = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022;
     address constant ETH_ORACLE       = 0x64DE91F5A373Cd4c28de3600cB34C7C6cE410C85;
     address constant STECRV           = 0x06325440D014e39736583c165C2963BA99fAf14E;
+    address constant STETH            = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
 
     Hevm hevm;
     CurveLPOracleFactory factory;
@@ -53,7 +100,7 @@ contract ETHstETHPoolTest is DSTest {
         factory = new CurveLPOracleFactory(ADDRESS_PROVIDER);
         orbs.push(ETH_ORACLE);
         orbs.push(address(new MockOracle()));
-        oracle  = CurveLPOracle(factory.build(address(this), POOL, "steCRV", orbs));
+        oracle  = CurveLPOracle(payable(factory.build(address(this), POOL, "steCRV", orbs, true)));
         oracle.kiss(address(this));
 
         // Whitelist steCRV oracle to read from the ETH oracle
@@ -81,6 +128,7 @@ contract ETHstETHPoolTest is DSTest {
         for (uint256 i = 0; i < orbs.length; i++) {
             assertTrue(orbs[i] == oracle.orbs(i)); 
         }
+        assertTrue(oracle.nonreentrant());
     }
 
     function test_poke() public {
@@ -96,5 +144,32 @@ contract ETHstETHPoolTest is DSTest {
         (bytes32 val, bool has) = oracle.peep();
         assertTrue(has);
         assertEq(expectation, uint256(val));
+    }
+
+    function testFail_reentrant_poke() public {
+        uint256 endowment = oracle.pool().balance;  // we'll double the amount of Ether in the pool
+        Evil evil = new Evil{value: endowment}(oracle);
+
+        // Give approximately the same amount of stETH
+        uint256 shares = StethLike(STETH).getSharesByPooledEth(endowment);
+        hevm.store(
+            STETH,
+            keccak256(abi.encode(address(evil), uint256(0))),
+            bytes32(shares)
+        );
+        assertEq(ERC20(STETH).balanceOf(address(evil)), StethLike(STETH).getPooledEthByShares(shares));
+
+        uint256 p_ETH = OracleLike(orbs[0]).read();
+        MockOracle(orbs[1]).setPrice(p_ETH);  // for simplicity, assume price(stETH) == price(ETH)
+
+        // uncomment to examine numerical effects if using unsafe implementation
+//        uint256 p_virt = CurvePoolLike(POOL).get_virtual_price();
+//        uint256 expectation = p_virt * p_ETH / WAD;
+
+        evil.attack();
+
+        // uncomment to examine numerical effects if using unsafe implementation
+//        (bytes32 val,) = oracle.peep();
+//        assertEq(expectation, uint256(val));
     }
 }

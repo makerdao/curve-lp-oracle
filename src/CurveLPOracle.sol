@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// CurveLPOracle.sol
 
@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.11;
+pragma solidity 0.8.13;
 
 interface AddressProviderLike {
     function get_registry() external view returns (address);
@@ -31,6 +31,7 @@ interface CurvePoolLike {
     function coins(uint256) external view returns (address);
     function get_virtual_price() external view returns (uint256);
     function lp_token() external view returns (address);
+    function remove_liquidity(uint256, uint256[2] calldata) external returns (uint256);
 }
 
 interface OracleLike {
@@ -39,9 +40,9 @@ interface OracleLike {
 
 contract CurveLPOracleFactory {
 
-    AddressProviderLike immutable ADDRESS_PROVIDER;
+    AddressProviderLike public immutable ADDRESS_PROVIDER;
 
-    event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool);
+    event NewCurveLPOracle(address owner, address orcl, bytes32 wat, address pool, bool nonreentrant);
 
     constructor(address addressProvider) {
         ADDRESS_PROVIDER = AddressProviderLike(addressProvider);
@@ -51,12 +52,13 @@ contract CurveLPOracleFactory {
         address _owner,
         address _pool,
         bytes32 _wat,
-        address[] calldata _orbs
+        address[] calldata _orbs,
+        bool _nonreentrant
     ) external returns (address orcl) {
         uint256 ncoins = CurveRegistryLike(ADDRESS_PROVIDER.get_registry()).get_n_coins(_pool)[1];
         require(ncoins == _orbs.length, "CurveLPOracleFactory/wrong-num-of-orbs");
-        orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs));
-        emit NewCurveLPOracle(_owner, orcl, _wat, _pool);
+        orcl = address(new CurveLPOracle(_owner, _pool, _wat, _orbs, _nonreentrant));
+        emit NewCurveLPOracle(_owner, orcl, _wat, _pool, _nonreentrant);
     }
 }
 
@@ -93,9 +95,10 @@ contract CurveLPOracle {
 
     address[] public orbs;  // array of price feeds for pool assets, same order as in the pool
 
-    address public immutable pool;    // Address of underlying Curve pool
-    bytes32 public immutable wat;     // Label of token whose price is being tracked
-    uint256 public immutable ncoins;  // Number of tokens in underlying Curve pool
+    address public immutable pool;          // Address of underlying Curve pool
+    bytes32 public immutable wat;           // Label of token whose price is being tracked
+    uint256 public immutable ncoins;        // Number of tokens in underlying Curve pool
+    bool    public immutable nonreentrant;  // Whether to prevent pool reentrancy
 
     // --- Events ---
     event Rely(address indexed usr);
@@ -109,13 +112,14 @@ contract CurveLPOracle {
     event Diss(address a);
 
     // --- Init ---
-    constructor(address _ward, address _pool, bytes32 _wat, address[] memory _orbs) {
+    constructor(address _ward, address _pool, bytes32 _wat, address[] memory _orbs, bool _nonreentrant) {
         require(_pool != address(0), "CurveLPOracle/invalid-pool");
         uint256 _ncoins = _orbs.length;
         pool   = _pool;
         src    = CurvePoolLike(_pool).lp_token();
         wat    = _wat;
         ncoins = _ncoins;
+        nonreentrant = _nonreentrant;
         for (uint256 i = 0; i < _ncoins;) {
             require(_orbs[i] != address(0), "CurveLPOracle/invalid-orb");
             orbs.push(_orbs[i]);
@@ -220,6 +224,12 @@ contract CurveLPOracle {
             )
         }
 
+        // This will revert if called during execution of a state-modifying pool function.
+        if (nonreentrant) {
+            uint256[2] calldata amounts;
+            CurvePoolLike(pool).remove_liquidity(0, amounts);
+        }
+
         emit Value(cur_.val, uint128(val));
 
         // Safe to terminate immediately since no postfix modifiers are applied.
@@ -266,4 +276,8 @@ contract CurveLPOracle {
             unchecked { i++; }
         }
     }
+
+    // Needed for Curve pool reentrancy checks, since remove_liquidity with call the caller to do an ETH transfer.
+    // Technically we receive 0 Ether, but using a payable function saves a little gas.
+    receive() external payable {}
 }

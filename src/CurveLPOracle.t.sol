@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Copyright (C) 2021 Dai Foundation
 
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity 0.8.11;
+pragma solidity 0.8.13;
 
 import "ds-test/test.sol";
 
@@ -29,8 +29,16 @@ interface Hevm {
 contract MockCurvePool {
     uint256 public get_virtual_price;
     address public lp_token;
+    bool public locked;
     function setVirtualPrice(uint256 _vp) external {
         get_virtual_price = _vp;
+    }
+    function lock() external {
+        locked = true;
+    }
+    function remove_liquidity(uint256 _amount, uint256[2] calldata _min_amounts) external view {
+        _amount; _min_amounts;  // silence warnings
+        require(!locked);
     }
 }
 
@@ -59,7 +67,7 @@ contract CurveLPOracleTest is DSTest {
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
         orbs.push(address(new MockOracle()));
-        oracle = new CurveLPOracle(address(this), address(pool), "123CRV", orbs);
+        oracle = new CurveLPOracle(address(this), address(pool), "123CRV", orbs, false);
         oracle.step(DEFAULT_HOP);
 
         // set up some default price values
@@ -75,27 +83,28 @@ contract CurveLPOracleTest is DSTest {
     }
 
     function test_constructor_and_public_fields() public {
-        oracle = new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs);
+        oracle = new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs, false);
         assertEq(oracle.wards(address(0x123)), 1);
         assertTrue(oracle.pool() == address(pool));
         assertTrue(oracle.wat() == "123CRV");
         assertEq(oracle.ncoins(), orbs.length);
+        assertTrue(!oracle.nonreentrant());
         for (uint256 i = 0; i < orbs.length; i++) {
             assertTrue(oracle.orbs(i) == orbs[i]);
         }
     }
 
     function testFail_constructor_ward_zero() public {
-        new CurveLPOracle(address(0), address(pool), "123CRV", orbs);
+        new CurveLPOracle(address(0), address(pool), "123CRV", orbs, false);
     }
 
     function testFail_constructor_pool_addr_zero() public {
-        new CurveLPOracle(address(0x123), address(0), "123CRV", orbs);
+        new CurveLPOracle(address(0x123), address(0), "123CRV", orbs, false);
     }
 
     function testFail_constructor_zero_orb() public {
         orbs[1] = address(0);
-        new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs);
+        new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs, false);
     }
 
     function test_step() public {
@@ -433,5 +442,31 @@ contract CurveLPOracleTest is DSTest {
         assertTrue(uint256(uint128(memnxt)) > 0);          // Assert nxt has value
         assertEq(uint256(val), uint256(uint128(memnxt)));  // Assert slot value == nxt
         assertEq(uint256(uint128(memhas)), 1);             // Assert slot has == 1
+    }
+
+    function test_constructor_nonreentrant() public {
+        oracle = new CurveLPOracle(address(0x123), address(pool), "123CRV", orbs, true);
+        assertTrue(oracle.nonreentrant());
+    }
+
+    function doReentrantPokeOnFreshOracle(CurveLPOracle _oracle) internal {
+        _oracle.step(DEFAULT_HOP);
+        _oracle.kiss(address(this));
+
+        hevm.warp(_oracle.zph());
+
+        pool.lock();
+        assertTrue(_oracle.pass());
+        _oracle.poke();
+    }
+
+    function test_not_nonreentrant() public {
+        oracle = new CurveLPOracle(address(this), address(pool), "123CRV", orbs, false);
+        doReentrantPokeOnFreshOracle(oracle);
+    }
+
+    function testFail_nonreentrant() public {
+        oracle = new CurveLPOracle(address(this), address(pool), "123CRV", orbs, true);
+        doReentrantPokeOnFreshOracle(oracle);
     }
 }
