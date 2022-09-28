@@ -128,7 +128,7 @@ contract CurveLPOracleTest is DSTest {
         assertEq(oracle.zph(), zph);  // back to original value
         assertEq(oracle.zzz(), zzz);
 
-        oracle.stop();  // sets zph to zero
+        oracle.void();  // sets zph to zero
 
         // Because block.timestamp is monotone and zph is always set to block.timestamp + hop in poke(),
         // zph == 0 is the only possible situation in which zph < oldHop can obtain.
@@ -153,7 +153,37 @@ contract CurveLPOracleTest is DSTest {
         assertEq(oracle.zzz(), 0);
     }
 
-    function test_stop() public {
+    function test_stop_start() public {
+        oracle.kiss(address(this));
+
+        (bytes32 curValPrev, bool curHasPrev) = oracle.peek();
+        (bytes32 nxtValPrev, bool nxtHasPrev) = oracle.peep();
+        assertTrue(curValPrev > 0);
+        assertTrue(curHasPrev);
+        assertTrue(nxtValPrev > 0);
+        assertTrue(nxtHasPrev);
+        assertEq(uint256(oracle.stopped()), 0);
+
+        oracle.stop();
+        assertEq(uint256(oracle.stopped()), 1);
+        (bytes32 curVal, bool curHas) = oracle.peek();
+        (bytes32 nxtVal, bool nxtHas) = oracle.peep();
+        assertEq(curValPrev, curVal);
+        assertTrue(curHas);
+        assertEq(nxtValPrev, nxtVal);
+        assertTrue(nxtHas);
+
+        oracle.start();
+        assertEq(uint256(oracle.stopped()), 0);
+        (curVal, curHas) = oracle.peek();
+        (nxtVal, nxtHas) = oracle.peep();
+        assertEq(curValPrev, curVal);
+        assertTrue(curHas);
+        assertEq(nxtValPrev, nxtVal);
+        assertTrue(nxtHas);
+    }
+
+    function test_void() public {
         oracle.kiss(address(this));  // whitelist for reading
 
         // Check that both current and pending values are non-zero and valid
@@ -168,7 +198,8 @@ contract CurveLPOracleTest is DSTest {
         assertGt(oracle.zzz(), 0);
 
         assertEq(oracle.stopped(), 0);
-        oracle.stop();
+
+        oracle.void();
         assertEq(oracle.stopped(), 1);
 
         // Values should be zero and invalid
@@ -183,9 +214,63 @@ contract CurveLPOracleTest is DSTest {
         assertEq(oracle.zzz(), 0);
     }
 
+    function test_void_start_poke() public {
+        oracle.kiss(address(this));
+        (bytes32 val, bool has) = oracle.peep();
+
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+        assertEq(uint256(oracle.stopped()), 0);
+
+        oracle.void();
+        assertEq(uint256(oracle.stopped()), 1);
+        // No time change between void and start
+
+        oracle.start();
+        assertEq(uint256(oracle.stopped()), 0);
+
+        oracle.poke();
+
+        (val, has) = oracle.peep();
+
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+    }
+
+    function test_stop_void_start_poke() public {
+        oracle.kiss(address(this));
+        (bytes32 val, bool has) = oracle.peep();
+
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+        assertEq(uint256(oracle.stopped()), 0);
+
+        oracle.stop();
+        assertEq(uint256(oracle.stopped()), 1);
+
+        oracle.void();
+        assertEq(uint256(oracle.stopped()), 1);
+        // No time change between void and start
+
+        oracle.start();
+        assertEq(uint256(oracle.stopped()), 0);
+
+        oracle.poke();
+
+        (val, has) = oracle.peep();
+
+        assertGt(uint256(val), 0);
+        assertTrue(has);
+    }
+
     function testFail_stop_not_authed() public {
         oracle.deny(address(this));
         oracle.stop();
+    }
+
+    function testFail_void_not_authed() public {
+        oracle.deny(address(this));
+        oracle.void();
     }
 
     function test_start() public {
@@ -273,6 +358,13 @@ contract CurveLPOracleTest is DSTest {
         hevm.warp(oracle.zph());
         assertTrue(oracle.pass());
         oracle.stop();
+        oracle.poke();
+    }
+
+    function testFail_poke_stopped_via_void() public {
+        hevm.warp(oracle.zph());
+        assertTrue(oracle.pass());
+        oracle.void();
         oracle.poke();
     }
 
