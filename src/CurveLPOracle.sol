@@ -192,7 +192,7 @@ contract CurveLPOracle {
                 zph_      := shr(24, slot1)
             }
 
-            // When purely stopped or voided, disallow updating in those cases.
+            // When purely stopped or done via void, disallow updating.
             require(stopped_ == 0, "CurveLPOracle/is-stopped");
 
             // Equivalent to requiring that pass() returns true; logic repeated to save gas.
