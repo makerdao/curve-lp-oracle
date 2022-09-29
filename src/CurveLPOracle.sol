@@ -105,6 +105,7 @@ contract CurveLPOracle {
     event Deny(address indexed usr);
     event Stop();
     event Start();
+    event Void();
     event Step(uint256 hop);
     event Link(uint256 id, address orb);
     event Value(uint128 curVal, uint128 nxtVal);
@@ -132,15 +133,20 @@ contract CurveLPOracle {
 
     function stop() external auth {
         stopped = 1;
-        delete cur;
-        delete nxt;
-        zph = 0;
         emit Stop();
     }
 
     function start() external auth {
         stopped = 0;
         emit Start();
+    }
+
+    function void() external auth {
+        stopped = 1;
+        delete cur;
+        delete nxt;
+        zph = 0;
+        emit Void();
     }
 
     function step(uint16 _hop) external auth {
@@ -186,7 +192,7 @@ contract CurveLPOracle {
                 zph_      := shr(24, slot1)
             }
 
-            // When stopped, values are set to zero and should remain such; thus, disallow updating in that case.
+            // When purely stopped or done via void, disallow updating.
             require(stopped_ == 0, "CurveLPOracle/is-stopped");
 
             // Equivalent to requiring that pass() returns true; logic repeated to save gas.
